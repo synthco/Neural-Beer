@@ -14,7 +14,7 @@ def main():
     p_bing.add_argument("--classes", type=Path, default=Path("configs/classes.yaml"))
     p_bing.add_argument("--queries", type=Path, default=Path("configs/queries.yaml"))
     p_bing.add_argument("--per-query", type=int, default=120)
-    p_bing.add_argument("--min_side", type=int, default=512)
+    p_bing.add_argument("--min-side", type=int, default=512)
 
     args = parser.parse_args()
     ensure_dirs()
