@@ -1,0 +1,17 @@
+bing:
+  lager:
+    - "lager beer glass -bottle -can -logo"
+    - "pilsner beer flute glass -bottle -can -mockup"
+  wheat:
+    - "wheat beer glass -bottle -can -logo"
+    - "hefeweizen glass -bottle -can"
+  ipa:
+    - "ipa beer tulip glass -bottle -can -logo"
+    - "neipa hazy ipa glass -bottle -can -illustration"
+  stout:
+    - "stout pint glass -bottle -can -logo"
+  porter:
+    - "porter beer glass -bottle -can -logo"
+  sour:
+    - "sour beer glass -bottle -can -logo"
+    - "fruit sour beer glass -bottle -can"
