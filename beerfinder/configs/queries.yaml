@@ -39,7 +39,7 @@ bing:
 instagram:
   hashtags:
     lager: ["#lager", "#pilsner", "#ontap", "#craftbeer", "#beerphotography"]
-    wheat: ["#wheatbeer", "#hefeweizen", "#witbier", "#weizenglas", "#dunkelweizen"]
+    wheat: ["#wheatbeer", "#hefeweizen", "#witbier", "#weizenglas", "#weissbier"]
     ipa: ["#ipa", "#westcoastipa", "#neipa", "#dipA", "#hophead"]
     stout: ["#stout", "#imperialstout", "#nitrostout", "#oatmealstout", "#darkbeer"]
     porter: ["#porter", "#robustporter", "#balticporter", "#brownporter", "#darkale"]
