@@ -1,238 +1,250 @@
-"""Instagram data source for BeerFinder.
-
-This module provides an object-oriented wrapper around the `instaloader`
-package to collect Instagram photos by hashtag and store them as part of the
-BeerFinder raw dataset together with metadata CSV.
-"""
-
 from __future__ import annotations
-
-from dataclasses import asdict, dataclass
-from datetime import datetime
-from itertools import islice
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Iterable
-from urllib.parse import urlparse
-from urllib.request import Request, urlopen
-
+from typing import Iterable, List, Optional
 import hashlib
-
 import pandas as pd
 from PIL import Image
-
-from instaloader import Hashtag, Instaloader, InstaloaderException, Post
+from datetime import datetime, timezone
+import yaml
+import time
+import instaloader
+from instaloader import Post
 
 
 @dataclass
 class MetaRow:
-    """Metadata row describing a downloaded Instagram image."""
-
     image_id: str
     klass: str
     source: str
     source_url: str | None
     orig_path: str
     orig_filename: str
-    width: int | None
-    height: int | None
-    added_at: str
+    width: int
+    height_at: str
+
+@dataclass
+class AttributionRow:
+    image_id: str
+    author_username: Optional[str]
+    owner_id: Optional[str]
+    license_note: str
 
 
-def _now_iso() -> str:
-    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+def _ensure_csv(path: Path, columns: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        pd.DataFrame(columns=columns).to_csv(path, index=False)
 
+
+def _utc_aware(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+
+def _shortcode_url(sc) -> str:
+    return f"https://www.instagram.com/p/{sc}/"
+
+
+def _keep_by_size(p: Path, min_side: int) -> tuple[bool, int | None, int | None]:
+    try:
+        with Image.open(p) as im:
+            w, h = im.size
+            if min(w, h) < min_side:
+                p.unlink(missing_ok=True)
+                return False, None, None
+            return True, w, h
+    except Exception:
+        p.unlink(missing_ok=True)
+        return False, None, None
 
 def _sha1(path: Path) -> str:
     return hashlib.sha1(path.read_bytes()).hexdigest()
 
 
-def _safe_segment(value: str) -> str:
-    """Return a filesystem-safe representation of ``value``."""
-
-    return "".join(c if c.isalnum() or c in "-._" else "_" for c in value)[:120]
+def _now_iso():
+    return datetime.utcnow().isoformat(timespec='seconds')
 
 
 class InstagramSource:
-    """Download Instagram photos by hashtags to build a beer dataset."""
 
-    def __init__(
-        self,
-        raw_root: Path,
-        meta_csv: Path,
-        per_hashtag: int = 120,
-        min_side: int = 512,
-        login_user: str | None = None,
-        login_password: str | None = None,
-        request_timeout: int = 30,
-    ) -> None:
+    def __init__(self,
+                 raw_root: Path,
+                 meta_csv: Path,
+                 attr_csv: Path,
+                 secrets_yaml: Path,
+                 per_hashtag: int= 450,
+                 since_date: str = "2023-01-01",
+                 include_carousel: bool = True):
+
         self.root = raw_root / "instagram"
         self.root.mkdir(parents=True, exist_ok=True)
-
         self.meta_csv = meta_csv
-        self.meta_csv.parent.mkdir(parents=True, exist_ok=True)
+        self.attr_csv = attr_csv
+        _ensure_csv(self.meta_csv, [f.name for f in MetaRow.__dataclass_fields__.values()])
+        _ensure_csv(self.attr_csv, [f.name for f in AttributionRow.__dataclass_fields__.values()])
 
-        self.per_hashtag = per_hashtag
-        self.min_side = min_side
-        self.request_timeout = request_timeout
+        with open(secrets_yaml, "r") as f:
+            sec = yaml.safe_load(f) or {}
+        sec = sec.get("instagram", {})
 
-        self.loader = Instaloader(
-            download_videos=False,
+        self.loader = instaloader.Instaloader(
+            download_videos= False,
+            download_pictures=True,
             download_video_thumbnails=False,
-            download_geotags=False,
+            save_metadata=False,
             download_comments=False,
             compress_json=False,
-            save_metadata=False,
             post_metadata_txt_pattern="",
+            dirname_pattern = str((raw_root / "meta" / "ig_tmp" / "{target}").as_posix()),
+            max_connection_attempts=3,
+            #user_agent= <For future>
         )
 
-        if login_user and login_password:
-            self.loader.login(login_user, login_password)
+        username = sec.get("username")
+        sessionfile = sec.get("sessionfile")
+        password = sec.get("password")
 
-        self._existing_urls: set[str] = set()
-        if self.meta_csv.exists():
+        if sessionfile:
             try:
-                df_existing = pd.read_csv(self.meta_csv)
-                if "source_url" in df_existing.columns:
-                    self._existing_urls = {
-                        str(url).split("?")[0]
-                        for url in df_existing["source_url"].dropna().unique().tolist()
-                    }
+                self.loader.load_session_from_file(username, sessionfile)
             except Exception:
-                # If the CSV cannot be read (e.g., empty or malformed), treat as empty.
-                self._existing_urls = set()
+                if username and password:
+                    self.loader.login(username, password)
+                    self.loader.save_session_to_file(sessionfile=sessionfile)
+        elif username and password:
+            self.loader.login(username, password)
 
-        if not self.meta_csv.exists():
-            pd.DataFrame(
-                columns=[f.name for f in MetaRow.__dataclass_fields__.values()]
-            ).to_csv(self.meta_csv, index=False)
+        self.per_hashtag = per_hashtag
+        self.since_date = _utc_aware(datetime.fromisoformat(since_date))
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    def collect_class(self, klass: str, hashtags: Iterable[str]) -> int:
-        """Collect images for a beer ``klass`` using Instagram hashtags."""
+        self._seen_ids = set(pd.read_csv(self.meta_csv)["image_id"].unique()) if self.meta_csv.exists() else set()
 
+    def _append_rows(self, rows: list[MetaRow], attrs: list[AttributionRow]) -> int:
+        if not rows:
+            return 0
+
+        df_new = pd.DataFrame([asdict(r) for r in rows])
+        df_attr_new = pd.DataFrame([asdict(a) for a in attrs]) if  attrs else pd.DataFrame(columns=[f.name for f in AttributionRow.__dataclass_fields__.values()])
+
+        if self.meta_csv.exists():
+            df_old = pd.read_csv(self.meta_csv)
+            df = pd.concat([df_old, df_new], ignore_index=True).drop_duplicates(subset=["image_id"])
+        else:
+            df = df_new
+        df.to_csv(self.meta_csv, index=False)
+
+        if self.attr_csv.exists():
+            df_attr_old = pd.read_csv(self.attr_csv)
+            df_attr = pd.concat([df_attr_old, df_attr_new], ignore_index=True).drop_duplicates(subset=["image_id"])
+
+        else:
+            df_attr = df_attr_new
+        df_attr.to_csv(self.attr_csv, index=False)
+
+        self._seen_ids.update(df_new["image_id"].tolist())
+
+        return len(df_new)
+
+    def collect_class_by_hashtags(self, klass: str, hastags: Iterable[str], min_side: int) -> int:
         kdir = self.root / klass
         kdir.mkdir(parents=True, exist_ok=True)
 
-        rows: list[MetaRow] = []
+        total_added = 0
 
-        for hashtag in hashtags:
-            tag = hashtag.lstrip("#")
-            safe_tag = _safe_segment(tag)
-            tag_dir = kdir / safe_tag
-            tag_dir.mkdir(parents=True, exist_ok=True)
+        for tag in hastags:
+            rows: list[MetaRow] = []
+            attrs: list[AttributionRow] = []
 
             try:
-                hashtag_posts = Hashtag.from_name(self.loader.context, tag)
-            except InstaloaderException as exc:
-                print(f"[instagram] skip '#{tag}': {exc}")
+                ht = instaloader.Hashtag.from_name(self.loader.context, tag.lstrip("#"))
+            except Exception as e:
+                print(f"[warn] failed to resolve #'{tag}: {e}'")
                 continue
 
-            new_rows = self._collect_hashtag(klass, tag_dir, hashtag_posts)
-            rows.extend(new_rows)
+            count = 0
 
-        if rows:
-            self._append_meta(rows)
+            #posts most revent first
+            for post in ht.get_posts():
+                if _utc_aware(post.date) < self.since_date:
+                    break
 
-        return len(rows)
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-    def _collect_hashtag(self, klass: str, tag_dir: Path, hashtag: Hashtag) -> list[MetaRow]:
-        rows: list[MetaRow] = []
-
-        for post in islice(hashtag.get_posts(), self.per_hashtag):
-            post_url = f"https://www.instagram.com/p/{post.shortcode}/"
-            if post_url in self._existing_urls:
-                continue
-
-            for idx, image_url in self._iter_image_urls(post):
-                parsed = urlparse(image_url)
-                ext = Path(parsed.path).suffix.lower()
-                if ext not in {".jpg", ".jpeg", ".png"}:
-                    ext = ".jpg"
-
-                dest_path = tag_dir / f"{post.shortcode}_{idx}{ext}"
-
-                if not self._download_image(image_url, dest_path):
+                if post.is_video:
+                    continue
+                if not self._post_has_photo(post):
+                    continue
+                
+                time.sleep(0.2)
+                
+                sc = post.shortcode
+                url = _shortcode_url(sc)
+                try:
+                    self.loader.download_post(post, target=f"HASHTAG_{tag}")
+                except Exception as e:
+                    print(f"[warn] failed to download post: '{post.id}': {e}")
                     continue
 
-                keep, width, height = self._keep_by_size(dest_path)
-                if not keep:
+                img_paths = self._find_downloaded_images(sc)
+                if not img_paths:
                     continue
 
-                image_id = _sha1(dest_path)
-                timestamp = _now_iso()
+                saved_any = False
+                for p in img_paths:
+                    ok, w, h = _keep_by_size(p, min_side)
+                    if not ok:
+                        continue
+                    img_id = _sha1(p)
+                    if img_id in self._seen_ids:
+                        continue
 
-                rows.append(
-                    MetaRow(
-                        image_id=image_id,
+                    dst = kdir / f"{img_id}.jpg"
+                    dst.write_text(p.read_bytes())
+
+                    rows.append(MetaRow(
+                        image_id=img_id,
                         klass=klass,
                         source="instagram",
-                        source_url=f"{post_url}?img={idx}",
-                        orig_path=str(dest_path),
-                        orig_filename=dest_path.name,
-                        width=width,
-                        height=height,
-                        added_at=timestamp,
-                    )
-                )
+                        source_url=url,
+                        orig_path=str(dst),
+                        orig_filename=dst.name,
+                        width=w,
+                        height=h,
+                        added_at=_now_iso()
+                    ))
+                    attrs.append(AttributionRow(
+                        image_id=img_id,
+                        author_username=getattr(post.owner_profile, "username", None),
+                        owner_id=getattr(post.owner_profile, "userid", None),
+                        license_note="Copyright belongs to the original Instagram author. Collected for research/non-commercial use; follow Instagram Terms."
+                    ))
+                    saved_any = True
+                    break
+                if saved_any:
+                    count += 1
+                    if count >= self.per_hashtag:
+                        break
+            total_added += self._append_rows(rows, attrs)
+        return total_added
 
-            self._existing_urls.add(post_url)
-
-        return rows
-
-    def _iter_image_urls(self, post: Post):
-        """Yield image index and URL pairs for a post, skipping videos."""
-
-        if post.typename == "GraphSidecar":
-            for idx, node in enumerate(post.get_sidecar_nodes()):
-                if getattr(node, "is_video", False):
-                    continue
-                yield idx, node.display_url
-        else:
-            if not post.is_video:
-                yield 0, post.url
-
-    def _download_image(self, url: str, dest: Path) -> bool:
-        """Download image from ``url`` to ``dest`` using urllib."""
-
-        try:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-
-            request = Request(url, headers={"User-Agent": self.loader.context.user_agent})
-            with urlopen(request, timeout=self.request_timeout) as response:
-                data = response.read()
-
-            dest.write_bytes(data)
+    @staticmethod
+    def _post_has_photo(post: Post) -> bool:
+        if post.typename == "GraphImage":
             return True
-        except Exception as exc:
-            print(f"[instagram] failed to download {url}: {exc}")
-            dest.unlink(missing_ok=True)
-            return False
+        if post.typename == "GraphSidecar" and any(not r.is_video for r in post.get_sidecar_nodes()):
+            return True
+        return False
 
-    def _keep_by_size(self, path: Path) -> tuple[bool, int | None, int | None]:
-        try:
-            with Image.open(path) as image:
-                width, height = image.size
-                if min(width, height) < self.min_side:
-                    path.unlink(missing_ok=True)
-                    return False, None, None
-                return True, width, height
-        except Exception:
-            path.unlink(missing_ok=True)
-            return False, None, None
+    def _find_downloaded_images(self, sc: str) -> list[Path]:
+        #instaloader saves as <date>_{shortcode}.jpg
+        tmp_root = Path(
+            self.loader.dirname_pattern.split("{")[0]) if "{target}" in self.loader.dirname_pattern else Path(
+            self.loader.dirname_pattern)
+        return sorted([p for p in (Path("data") / "meta" / "ig_tmp").rglob(f"*{sc}*.jpg") if p.is_file()])
 
-    def _append_meta(self, rows: list[MetaRow]) -> None:
-        df_new = pd.DataFrame([asdict(row) for row in rows])
 
-        try:
-            df_old = pd.read_csv(self.meta_csv)
-        except Exception:
-            df_old = pd.DataFrame(columns=df_new.columns)
 
-        df = pd.concat([df_old, df_new], ignore_index=True).drop_duplicates(subset=["image_id"])
-        df.to_csv(self.meta_csv, index=False)
+
+
+
+
+
 
