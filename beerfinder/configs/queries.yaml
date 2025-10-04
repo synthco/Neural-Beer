@@ -36,7 +36,7 @@ bing:
     - "berliner weisse style sour colorful glass -bottle -can -logo"
     - "wild ale sour rustic tulip teku -bottle -can -logo"
 
-instagram:
+instagram: #Check if a #needed
   hashtags:
     lager: ["#lager", "#pilsner", "#ontap", "#craftbeer", "#beerphotography"]
     wheat: ["#wheatbeer", "#hefeweizen", "#witbier", "#weizenglas", "#weissbier"]
