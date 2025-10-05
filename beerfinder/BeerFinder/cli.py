@@ -17,6 +17,10 @@ def main():
     p_bing.add_argument("--per-query", type=int, default=120)
     p_bing.add_argument("--min-side", type=int, default=512)
     p_bing.add_argument("--target-per-class", type=int, default=None, help="Desired minimum images per class; auto-allocates per-query")
+    p_bing.add_argument("--expand-per-class", type=int, default=None,
+                        help="If set, auto-expand queries to this many variants per class before download")
+    p_bing.add_argument("--expanded-queries-out", type=Path, default=META_DIR / "queries_expanded.yaml",
+                        help="Path to save expanded queries YAML (used if --expand-per-class is set)")
 
     # -------------------- INSTAGRAM --------------------
     p_ig = sub.add_parser("download-instagram", help="Download images from Instagram hashtags")
@@ -27,12 +31,30 @@ def main():
     p_ig.add_argument("--since", type=str, default="2023-01-01")  # YYYY-MM-DD
     p_ig.add_argument("--min-side", type=int, required=True)
 
+    # ----------------- BING: EXPAND QUERIES ONLY -----------------
+    p_bing_expand = sub.add_parser("expand-bing-queries", help="Generate expanded Bing queries YAML")
+    p_bing_expand.add_argument("--input", "-i", type=Path, required=True, help="Path to source queries.yaml")
+    p_bing_expand.add_argument("--output", "-o", type=Path, required=True, help="Where to save expanded YAML")
+    p_bing_expand.add_argument("--per-class", "-n", type=int, default=24, help="Target number of queries per class")
+
     args = parser.parse_args()
     ensure_dirs()
 
     if args.cmd == "download-bing":
         cls_cfg = load_yaml(args.classes)
-        qry_cfg = load_yaml(args.queries)
+
+        # Optionally expand the query file before loading
+        if args.expand_per_class:
+            # Use BingSource helper to expand and write a new YAML, then load from it
+            tmp_out = args.expanded_queries_out
+            BingSource(raw_root=RAW_DIR, meta_csv=META_DIR / "bing.csv").expand_queries(
+                args.queries, tmp_out, per_class=args.expand_per_class
+            )
+            queries_yaml_path = tmp_out
+        else:
+            queries_yaml_path = args.queries
+
+        qry_cfg = load_yaml(queries_yaml_path)
 
         raw_classes = cls_cfg.get("classes", [])
         class_map = cls_cfg.get("class_map", {})
@@ -64,6 +86,12 @@ def main():
             print(f"[bing] {k}: +{n} images")
 
         print(f"[bing] Done! Meta -> {META_DIR / 'bing.csv'}, total -> {total}")
+
+    elif args.cmd == "expand-bing-queries":
+        BingSource(raw_root=RAW_DIR, meta_csv=META_DIR / "bing.csv").expand_queries(
+            args.input, args.output, per_class=args.per_class
+        )
+        print(f"[bing] Queries expanded to {args.output}")
 
     elif args.cmd == "download-instagram":
         cls_cfg = load_yaml(args.classes)

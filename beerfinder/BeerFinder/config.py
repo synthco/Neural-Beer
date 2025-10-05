@@ -34,6 +34,6 @@ def load_yaml(path: str | Path) -> dict:
                 return yaml.safe_load(f) or {}
 
     # If still not found, raise a clearer error
-    raise FileNotFoundError(f"YAML file not found: {p} (also tried relative to {pkg_root if not p.is_absolute() else 'N/A'})")
+        raise FileNotFoundError(f"YAML file not found: {p} (also tried relative to {pkg_root if not p.is_absolute() else 'N/A'})")
 
 
