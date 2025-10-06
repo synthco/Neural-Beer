@@ -1,0 +1,65 @@
+bing:
+  lager:
+    - "lager beer in glass at bar -bottle -can -logo -mockup -illustration"
+    - "pale lager pilsner flute glass poured draft -bottle -can -logo -mockup"
+    - "helles lager in seidel mug pub draft -bottle -can -logo"
+    - "crystal clear lager condensation closeup pub -bottle -can -logo"
+    - "golden lager on tap pint glass foam head -bottle -can -logo"
+  wheat:
+    - "wheat beer in weizen tall glass cloudy -bottle -can -logo -mockup"
+    - "hefeweizen banana clove aroma in glass -bottle -can -logo"
+    - "witbier belgian white beer tulip glass -bottle -can -logo"
+    - "dunkelweizen dark wheat beer tall glass -bottle -can -logo"
+    - "wheat ale hazy golden in weizen vase -bottle -can -logo"
+  ipa:
+    - "ipa beer tulip/teku glass amber hops -bottle -can -logo -mockup"
+    - "west coast ipa clear golden nonic pint -bottle -can -logo"
+    - "neipa hazy juicy ipa tulip glass -bottle -can -logo -illustration"
+    - "double ipa dipa in snifter glass bar -bottle -can -logo"
+    - "session ipa light crisp shaker pint -bottle -can -logo"
+  stout:
+    - "stout beer in nonic pint creamy head -bottle -can -logo -mockup"
+    - "imperial stout dark in snifter pub -bottle -can -logo"
+    - "milk stout nitro cascading pour glass -bottle -can -logo"
+    - "dry stout guinness style pint with foam -bottle -can -logo"
+    - "oatmeal stout smooth dark pint glass -bottle -can -logo"
+  porter:
+    - "porter beer nonic pint ruby highlights -bottle -can -logo -mockup"
+    - "robust porter in glass bar lighting -bottle -can -logo"
+    - "brown porter in pint smooth head -bottle -can -logo"
+    - "baltic porter strong dark snifter glass -bottle -can -logo"
+    - "porter beer amber brown pub draft -bottle -can -logo"
+  sour:
+    - "sour beer bright color in tulip glass -bottle -can -logo -mockup"
+    - "fruited sour raspberry cherry teku glass -bottle -can -logo"
+    - "kettle sour golden in goblet foam -bottle -can -logo"
+    - "berliner weisse style sour colorful glass -bottle -can -logo"
+    - "wild ale sour rustic tulip teku -bottle -can -logo"
+
+instagram: #Check if a #needed
+  hashtags:
+    lager: ["#lager", "#pilsner", "#ontap", "#craftbeer", "#beerphotography"]
+    wheat: ["#wheatbeer", "#hefeweizen", "#witbier", "#weizenglas", "#weissbier"]
+    ipa: ["#ipa", "#westcoastipa", "#neipa", "#dipA", "#hophead"]
+    stout: ["#stout", "#imperialstout", "#nitrostout", "#oatmealstout", "#darkbeer"]
+    porter: ["#porter", "#robustporter", "#balticporter", "#brownporter", "#darkale"]
+    sour: ["#sourbeer", "#fruitedsour", "#berlinerweisse", "#wildale", "#teku"]
+
+  places_keywords:
+    - "taproom"
+    - "craft brewery"
+    - "beer bar"
+    - "brewpub"
+    - "taphouse"
+    - "beer garden"
+    - "pub"
+
+  instaloader_examples:
+    by_hashtag:
+      - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :HASHTAG:neipa"
+      - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :HASHTAG:stout"
+      - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :HASHTAG:lager"
+    by_place:
+      - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :PLACE:\"taproom\""
+      - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :PLACE:\"craft brewery\""
+      - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :PLACE:\"beer bar\""
