@@ -117,6 +117,38 @@ python -m BeerFinder.cli download-bing \
 ...
 [bing] done. meta → data/meta/bing.csv, total +480
 
+### Завантаження з Pexels
+
+1. **Отримай API key** у [Pexels Developers](https://www.pexels.com/api/).
+2. Створи `secrets/pexels.yaml` (формат довільний, головне щоб ключ потрапив під `pexels.key`, приклад нижче):
+
+   ```yaml
+   pexels:
+     key: "PEXELS_API_KEY"
+   ```
+
+3. Переконайся, що у `configs/queries.yaml` є секція `pexels:` із запитами для кожного класу (вже додано базові фрази на кшталт `"lager beer pint glass on bar"`).
+4. Запусти команду:
+
+   ```bash
+   python -m BeerFinder.cli download-pexels \
+     --classes configs/classes.yaml \
+     --queries configs/queries.yaml \
+     --secrets secrets/pexels.yaml \
+     --per-query 60 \
+     --min-side 512 \
+     --preferred-size original \
+     --orientation landscape
+   ```
+
+   Доступні ще `--max-pages`, `--orientation any|landscape|portrait|square`, `--locale en-US` тощо (див. `BeerFinder/cli.py`).
+
+5. Результат:
+   - зображення зберігаються у `data/raw/pexels/<class>/`;
+   - метадані → `data/meta/pexels.csv`;
+   - атрибуція (фотограф, посилання, замітка про ліцензію) → `data/meta/pexels_attribution.csv`.
+
+   При повторних запусках файли не дублюються — `image_id` рахується як SHA1 контенту (`BeerFinder/sources/pexels.py`).
 
 ⸻
 
