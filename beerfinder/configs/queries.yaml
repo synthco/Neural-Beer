@@ -63,3 +63,35 @@ instagram: #Check if a #needed
       - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :PLACE:\"taproom\""
       - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :PLACE:\"craft brewery\""
       - "instaloader --no-videos --fast-update --dirname-pattern=\"{target}\" :PLACE:\"beer bar\""
+
+pexels:
+  lager:
+    - "lager beer pint glass on bar"
+    - "golden lager draft beer pub"
+    - "pilsner lager tall glass foam"
+    - "crisp lager beer photography"
+  wheat:
+    - "hefeweizen wheat beer tall glass"
+    - "belgian witbier orange garnish"
+    - "cloudy wheat beer bar scene"
+    - "weissbier beer photography"
+  ipa:
+    - "ipa craft beer teku glass"
+    - "hazy ipa juicy beer pint"
+    - "west coast ipa clear pint"
+    - "double ipa snifter glass"
+  stout:
+    - "stout beer dark pint glass"
+    - "nitro stout cascading pour"
+    - "imperial stout snifter pub"
+    - "irish stout pint creamy head"
+  porter:
+    - "porter beer pint glass pub"
+    - "baltic porter snifter glass"
+    - "brown porter craft beer photo"
+    - "robust porter bar lighting"
+  sour:
+    - "sour beer colorful tulip glass"
+    - "fruited sour beer teku glass"
+    - "berliner weisse sour beer"
+    - "wild ale sour rustic glass"

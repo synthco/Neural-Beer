@@ -4,8 +4,8 @@ import argparse
 import math
 from pathlib import Path
 
-from config import META_DIR, RAW_DIR, ensure_dirs, load_yaml
-from sources import BingSource, InstagramSource, PexelsSource
+from .config import META_DIR, RAW_DIR, ensure_dirs, load_yaml
+from .sources import BingSource, InstagramSource, PexelsSource
 
 
 def main() -> None:
@@ -57,9 +57,9 @@ def main() -> None:
     p_pexels.add_argument("--classes", type=Path, default=Path("configs/classes.yaml"))
     p_pexels.add_argument("--queries", type=Path, default=Path("configs/queries.yaml"))
     p_pexels.add_argument("--secrets", type=Path, default=Path("secrets/pexels.yaml"))
-    p_pexels.add_argument("--per-query", type=int, default=60)
+    p_pexels.add_argument("--per-query", type=int, default=256)
     p_pexels.add_argument("--min-side", type=int, default=512)
-    p_pexels.add_argument("--max-pages", type=int, default=10)
+    p_pexels.add_argument("--max-pages", type=int, default=20)
     p_pexels.add_argument("--preferred-size", type=str, default="original")
     p_pexels.add_argument(
         "--orientation",

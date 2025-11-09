@@ -21,7 +21,8 @@ class MetaRow:
     orig_path: str
     orig_filename: str
     width: int
-    height_at: str
+    height: int
+    added_at: str
 
 @dataclass
 class AttributionRow:
@@ -61,8 +62,8 @@ def _sha1(path: Path) -> str:
     return hashlib.sha1(path.read_bytes()).hexdigest()
 
 
-def _now_iso():
-    return datetime.utcnow().isoformat(timespec='seconds')
+def _now_iso() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
 
 class InstagramSource:
@@ -197,7 +198,7 @@ class InstagramSource:
                         continue
 
                     dst = kdir / f"{img_id}.jpg"
-                    dst.write_text(p.read_bytes())
+                    dst.write_bytes(p.read_bytes())
 
                     rows.append(MetaRow(
                         image_id=img_id,
@@ -234,13 +235,13 @@ class InstagramSource:
         return False
 
     def _find_downloaded_images(self, sc: str) -> list[Path]:
-        #instaloader saves as <date>_{shortcode}.jpg
-        tmp_root = Path(
-            self.loader.dirname_pattern.split("{")[0]) if "{target}" in self.loader.dirname_pattern else Path(
-            self.loader.dirname_pattern)
-        return sorted([p for p in (Path("data") / "meta" / "ig_tmp").rglob(f"*{sc}*.jpg") if p.is_file()])
-
-
+        """Locate downloaded files that include the shortcode in their filename."""
+        pattern = self.loader.dirname_pattern
+        base_str = pattern.split("{target}")[0] if "{target}" in pattern else pattern
+        search_root = Path(base_str).expanduser()
+        if not search_root.exists():
+            return []
+        return sorted([p for p in search_root.rglob(f\"*{sc}*.jpg\") if p.is_file()])
 
 
 

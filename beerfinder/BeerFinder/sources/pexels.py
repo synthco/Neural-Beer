@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Any
 import hashlib
 
 import pandas as pd
@@ -98,20 +98,48 @@ class PexelsSource:
             sec = yaml.safe_load(fh) or {}
 
         # Support both "pexels" and typo "pexel" in secrets files.
-        candidates = []
-        for key in ("pexels", "pexel"):
-            val = sec.get(key)
-            if isinstance(val, dict):
-                candidates.extend(val.get("key") if isinstance(val.get("key"), list) else [val.get("key")])
-            elif isinstance(val, list):
-                candidates.extend(val)
-            elif isinstance(val, str):
-                candidates.append(val)
+        candidates: list[str] = []
+        for key_name in ("pexels", "pexel"):
+            if key_name in sec:
+                candidates.extend(PexelsSource._extract_key_candidates(sec[key_name]))
 
         api_key = next((k for k in candidates if k), None)
         if not api_key:
             raise ValueError("Pexels API key not found in secrets YAML.")
         return api_key
+
+    @staticmethod
+    def _extract_key_candidates(node: Any) -> list[str]:
+        """Recursively collect potential API keys from mixed YAML structures."""
+        keys: list[str] = []
+
+        if isinstance(node, str):
+            candidate = node.strip()
+            # Handle common typo where "-value" (without a space) is used instead of YAML list "- value".
+            if candidate.startswith("-") and not candidate.startswith("--") and " " not in candidate[:2]:
+                candidate = candidate[1:]
+            if candidate:
+                keys.append(candidate)
+            return keys
+
+        if isinstance(node, (list, tuple, set)):
+            for item in node:
+                keys.extend(PexelsSource._extract_key_candidates(item))
+            return keys
+
+        if isinstance(node, dict):
+            preferred_fields = ("key", "keys", "api_key", "apiKey")
+            matched = False
+            for field in preferred_fields:
+                if field in node:
+                    keys.extend(PexelsSource._extract_key_candidates(node[field]))
+                    matched = True
+            if not matched:
+                for value in node.values():
+                    keys.extend(PexelsSource._extract_key_candidates(value))
+            return keys
+
+        return keys
 
     def _request_json(self, query: str, page: int, per_page: int) -> dict:
         headers = {"Authorization": self.api_key}
