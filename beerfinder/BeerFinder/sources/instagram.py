@@ -241,7 +241,7 @@ class InstagramSource:
         search_root = Path(base_str).expanduser()
         if not search_root.exists():
             return []
-        return sorted([p for p in search_root.rglob(f\"*{sc}*.jpg\") if p.is_file()])
+        return sorted([p for p in search_root.rglob(f"*{sc}*.jpg") if p.is_file()])
 
 
 
